@@ -12,11 +12,14 @@ This directory contains scripts for cleaning the English CC100 dataset. The pipe
 - Normalizes Unicode to NFKC form
 - Removes emojis and rare Unicode characters
 - Normalizes dashes (em-dash, en-dash → hyphen)
-- Normalizes quotes (curly/smart quotes → straight quotes)
+- Normalizes quotes (curly/smart quotes → straight quotes; backticks → straight quotes)
 - Converts double dashes (`--`) to spaced single dash (` - `)
-- After this converts spaced dashes (` - `) to (`<DASH>`) to differentiate clause break from compound words
-- Normalizes ellipsis (`. . .` → `...`)
-- Spaces out punctuation marks while preserving commas in numbers (e.g., `1,000`) and spaces for dashes (in case of compound word or clause break)
+- Converts spaced dashes (` - `) to `<DASH>` to differentiate clause break from compound words
+- Normalizes ellipsis (`..`, `. . .`, and `....` → `...`) and keeps it spaced as a whole token
+- Collapses spaced exclamation sequences (`! ! !` → `!`)
+- Spaces out punctuation marks while preserving commas in numbers (e.g., `1,000`)
+- Spaces out parentheses and brackets (`()`, `[]`)
+- Spaces out quotes when they are not apostrophes inside words
 - Cleans excessive whitespace and newlines
 
 **Input:** `cc100_en.jsonl`
@@ -24,11 +27,13 @@ This directory contains scripts for cleaning the English CC100 dataset. The pipe
 
 ---
 
-### 2. `add_eos_tokens.py`
-**Role:** Add End-of-Sentence markers
-- Adds `<EOS>` tokens after periods (`.`) when followed by capital letters
-- Adds `<EOS>` tokens after question marks (`?`) when followed by capital letters
-- Preserves sentence boundary information for language models
+### 2. `add_bos_eos_tokens.py`
+**Role:** Add Begin/End-of-Sentence markers
+- Adds three `<BOS>` tokens at the start of each line (after any leading whitespace)
+- Adds `<EOS>` tokens after periods (`.`) when followed by capital letters, and inserts `<BOS>` tokens after those sentence breaks
+- Adds `<EOS>` tokens when a period is the last non-whitespace character in a line
+- Applies the same logic for `.)` (allowing optional spaces between `.` and `)`)
+- Skips ellipses by only matching single periods
 
 **Input:** `cc100_en_cleaned.jsonl`
 **Output:** `cc100_en_cleaned2.jsonl` *(Second Iteration)*
@@ -38,7 +43,7 @@ This directory contains scripts for cleaning the English CC100 dataset. The pipe
 ### 3. `convert_to_lowercase.py`
 **Role:** Final normalization to lowercase
 - Converts all text to lowercase for case-insensitive processing
-- **Preserves** special tokens: `<EOS>` and `<DASH>` remain uppercase
+- **Preserves** special tokens: `<EOS>`, `<BOS>`, and `<DASH>` remain uppercase
 - Maintains token integrity while normalizing character case
 
 **Input:** `cc100_en_cleaned2.jsonl`
@@ -56,9 +61,9 @@ After running `data_cleaning.py`
 - Maintains original capitalization
 
 ### Iteration 2: `cc100_en_cleaned2.jsonl`
-After running `add_eos_tokens.py`
+After running `add_bos_eos_tokens.py`
 - Contains all cleaning from Iteration 1
-- Includes `<EOS>` tokens marking sentence boundaries
+- Includes `<EOS>` and `<BOS>` tokens marking sentence boundaries
 - Maintains original capitalization
 - Ready for language model preprocessing
 
@@ -95,14 +100,17 @@ Run the cleaning pipeline in order:
 # Step 1: Initial cleaning
 python data_cleaning.py
 
-# Step 2: Add EOS tokens
-python add_eos_tokens.py
+# Step 2: Add BOS/EOS tokens
+python add_bos_eos_tokens.py
 
 # Step 3: Convert to lowercase
 python convert_to_lowercase.py
 
 # Optional: Analyze capital letters after periods
 python count_capitals_after_period.py
+
+# Optional2: Analyzing dashes with and without spaces
+python dash_analysis.py
 ```
 
 The final cleaned dataset will be saved in `cc100_en_cleaned_final.jsonl`

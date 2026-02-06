@@ -2,10 +2,11 @@ import json
 import re
 
 def lowercase_except_tokens(text):
-    """Convert text to lowercase while preserving <EOS> and <DASH> tokens."""
+    """Convert text to lowercase while preserving <EOS>, <BOS>, and <DASH> tokens."""
 
     # Replace special tokens with placeholders to protect them
     text = text.replace('<EOS>', '<PLACEHOLDER_EOS>')
+    text = text.replace('<BOS>', '<PLACEHOLDER_BOS>')
     text = text.replace('<DASH>', '<PLACEHOLDER_DASH>')
 
     # Convert everything to lowercase
@@ -13,6 +14,7 @@ def lowercase_except_tokens(text):
 
     # Restore the special tokens in their original form
     text = text.replace('<placeholder_eos>', '<EOS>')
+    text = text.replace('<placeholder_bos>', '<BOS>')
     text = text.replace('<placeholder_dash>', '<DASH>')
 
     return text
