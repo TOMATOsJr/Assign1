@@ -57,6 +57,15 @@ def clean_text(text):
     text = re.sub(r'(\D)([.!?,:;])', r'\1 \2', text)  # \D = not a digit
     # Add space after punctuation if not already there (and not end of string), but not commas between digits
     text = re.sub(r'([.!?,:;])(?!\d)', r'\1 ', text)  # Negative lookahead for digit after comma
+    # Space separate parentheses and brackets from words
+    text = re.sub(r'(\S)([()\[\]])', r'\1 \2', text)
+    text = re.sub(r'([()\[\]])(\S)', r'\1 \2', text)
+
+    # Space separate quotes when they are not apostrophes inside a word
+    text = text.replace('"', ' " ')  # Always separate double quotes
+    text = re.sub(r"(?<!\w)'(?!\w)", " ' ", text)
+    text = re.sub(r"(?<!\w)'(?=\w)", " ' ", text)
+    text = re.sub(r"(?<=\w)'(?!\w)", " ' ", text)
 
     # Convert ellipsis placeholder back to ...
     text = text.replace('<ELLIPSIS>', '...')
@@ -101,11 +110,11 @@ if __name__ == "__main__":
         "em-dash -- should be cleaned properly...   with spaces.",
         "Multiple!!! exclamation marks!!!!",
         "Test - with - dashes and-compound-words",
-        "Ellipsis. . .test and more..dots",
+        "Ellipsis. . .test 'and' more..dots",
         "Double dash--test and -- more -- tests",
         "Two dots..here and...three dots....many dots",
         "Spaced dots . . . and spaced ! ! ! and backticks `like this` and ``quote``",
-        "Curly quotes: “hello” and ‘world’ should be straight",
+        "Curly quotes: (“hello” and ‘world’ should be straight)",
         "a,b,c and 100,000 should not have spaces around commas, but a,b,c should become a , b , c"
     ]
 
