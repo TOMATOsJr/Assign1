@@ -59,29 +59,64 @@ def clean_text(text):
     text = text.replace('’', "'")  # Curly right single quote
 
     # Fold Latin diacritics and map special letters to ASCII
-    special_map = {
-        "æ": "ae",
-        "Æ": "AE",
-        "œ": "oe",
-        "Œ": "OE",
-        "ß": "ss",
-        "ø": "o",
-        "Ø": "O",
-        "đ": "d",
-        "Đ": "D",
-        "ð": "d",
-        "Ð": "D",
-        "þ": "",
-        "Þ": "",
-        "ł": "l",
-        "Ł": "L",
-    }
-    text = "".join(special_map.get(ch, ch) for ch in text)
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
+    # NOTE: For Mongolian dataset, we KEEP diacritics and don't normalize them
+    # special_map = {
+    #     "æ": "ae", "Æ": "AE", "œ": "oe", "Œ": "OE", "ß": "ss", "ø": "o", "Ø": "O",
+    #     "đ": "d", "Đ": "D", "ð": "d", "Ð": "D", "þ": "", "Þ": "", "ł": "l", "Ł": "L",
+    # }
+    # text = "".join(special_map.get(ch, ch) for ch in text)
+    # text = unicodedata.normalize("NFKD", text)
+    # text = "".join(ch for ch in text if unicodedata.category(ch) != "Mn")
 
-    # Keep ASCII only; remove non-ASCII characters
-    text = "".join(ch for ch in text if ord(ch) < 128)
+    # For Mongolian: Keep ONLY Cyrillic, Latin, digits, combining marks for Cyrillic, ASCII punctuation
+    # Remove: All other scripts (CJK, Korean, Arabic, Thai, Hindi, etc.), emojis, unwanted symbols
+    def is_valid_mongolian_char(ch):
+        code_point = ord(ch)
+        cat = unicodedata.category(ch)
+
+        # Keep letters only if they are Cyrillic or Latin
+        if cat[0] == 'L':  # Letter category
+            # Keep Cyrillic (U+0400–U+04FF) - includes Mongolian-specific chars Ө, ү, etc.
+            if 0x0400 <= code_point <= 0x04FF:
+                return True
+            # Keep Latin (A-Z, a-z, U+0041–U+005A, U+0061–U+007A)
+            if (0x0041 <= code_point <= 0x005A) or (0x0061 <= code_point <= 0x007A):
+                return True
+            # Remove ALL other scripts (CJK, Korean, Arabic, Thai, Hindi, Devanagari, etc.)
+            return False
+
+        # Keep ASCII digits (0-9, U+0030–U+0039)
+        if cat[0] == 'N':
+            if 0x0030 <= code_point <= 0x0039:
+                return True
+            # Remove other digit scripts (Arabic numerals, etc.)
+            return False
+
+        # Keep ONLY combining marks that are valid for Cyrillic/Latin
+        # Allow: Combining Diacritical Marks (U+0300–U+036F), Cyrillic combining (U+0483–U+0487)
+        # Exclude: All other script combining marks (Devanagari, Thai, Khmer, etc.)
+        if cat[0] == 'M':
+            if (0x0300 <= code_point <= 0x036F) or \
+               (0x0483 <= code_point <= 0x0487):
+                return True
+            # Remove marks from other scripts (Hindi, Thai, Khmer, etc.)
+            return False
+
+        # Remove emojis, symbols, and variation selectors
+        if cat in ('So', 'Cs'):
+            return False
+        if 0xFE00 <= code_point <= 0xFE0F:
+            return False
+
+        # Keep ASCII punctuation and spaces (U+0000–U+007F)
+        # This includes: ! " # $ % & ' ( ) * , - . / : ; < > ? @ [ \ ] ^ _ ` { | } etc.
+        if code_point <= 0x007F:
+            return True
+
+        # Remove everything else (punctuation/symbols from other scripts)
+        return False
+
+    text = "".join(ch for ch in text if is_valid_mongolian_char(ch))
 
     # Handle double dash: convert -- to - with spaces on both sides
     text = re.sub(r'--+', ' - ', text)  # Double dash or more → single dash with spaces
@@ -153,8 +188,9 @@ def process_file(input_file, output_file):
     print(f"Cleaned data written to {output_file}")
 
 if __name__ == "__main__":
-    # Test samples
+    # Test samples - including Mongolian examples
     test_sample = [
+        # English examples
         "Hello World! This is a test ... haha\n\n\nNew line here.\t\tExtra tabs.",
         "Another example with invisible characters.\n\n\n\nEnd of test.",
         "em-dash -- should be cleaned properly...   with spaces.",
@@ -164,8 +200,15 @@ if __name__ == "__main__":
         "Double dash--test and -- more -- tests",
         "Two dots..here and...three dots....many dots",
         "Spaced dots . . . and spaced ! ! ! and backticks `like this` and ``quote``",
-        "Curly quotes: (“hello” and ‘world’ should be straight)",
-        "a,b,c and 100,000 should not have spaces around commas, but a,b,c should become a , b , c"
+        "Curly quotes: (\"hello\" and 'world' should be straight)",
+        "a,b,c and 100,000 should not have spaces around commas, but a,b,c should become a , b , c",
+        # Mongolian examples
+        "Бүх төрлийн барилгын заслын ажил чанартай хийнэ - ZARMEDEE.MN",
+        "Яг юуг олж харахгүй байна вэ? _ www.baabar.mn _ Шилдэг нийтлэлчдийн клуб",
+        "Мөнх Монгол! 123 с Өнгөрөл үүрэг ба ангилал хариу...",
+        "Test with emoji 😀 and CJK should be removed from mixed text",
+        "Mixed: Эр Latin123 тест",
+        " 는니닐님다단담당대"
     ]
 
     print("Testing cleaning function:")
@@ -176,8 +219,5 @@ if __name__ == "__main__":
         print(f"Cleaned:  {clean_text(sample)}")
 
     print("\n" + "=" * 60)
-    print("\nProcessing English dataset...")
-    process_file("cc100_en.jsonl", "cc100_en_cleaned.jsonl")
-
-    # print("\nProcessing Mongolian dataset...")
-    # process_file("cc100_mn.jsonl", "cc100_mn_cleaned.jsonl")
+    print("\nProcessing Mongolian dataset...")
+    process_file("cc100_mn.jsonl", "cc100_mn_cleaned.jsonl")

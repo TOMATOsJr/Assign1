@@ -73,12 +73,12 @@ def main() -> None:
 	parser = argparse.ArgumentParser(description="Split JSONL into train/val/test")
 	parser.add_argument(
 		"--input",
-		default="cc100_en_cleaned_final.jsonl",
+		default="cc100_mn_cleaned_final.jsonl",
 		help="Input JSONL file",
 	)
-	parser.add_argument("--train", default="cc100_en_train.jsonl", help="Train output")
-	parser.add_argument("--val", default="cc100_en_val.jsonl", help="Val output")
-	parser.add_argument("--test", default="cc100_en_test.jsonl", help="Test output")
+	parser.add_argument("--train", default="cc100_mn_train.jsonl", help="Train output")
+	parser.add_argument("--val", default="cc100_mn_val.jsonl", help="Val output")
+	parser.add_argument("--test", default="cc100_mn_test.jsonl", help="Test output")
 	parser.add_argument("--seed", type=int, default=42, help="Random seed")
 
 	args = parser.parse_args()
