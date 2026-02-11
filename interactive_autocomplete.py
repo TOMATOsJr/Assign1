@@ -63,6 +63,17 @@ def _iter_tokenized(path: Path) -> Iterator[List[str]]:
             yield line.split()
 
 
+def _format_generated(tokens: List[str], eos_token: str) -> List[str]:
+    cleaned: List[str] = []
+    for token in tokens:
+        if token == eos_token:
+            break
+        if token in ("—", "–"):
+            token = "-"
+        cleaned.append(token)
+    return cleaned
+
+
 def get_smoothing(name: str):
     if name == "mle":
         return MLESmoothing()
@@ -88,9 +99,31 @@ def parse_args() -> argparse.Namespace:
         choices=["mle", "kneser_ney", "witten_bell"],
         default="mle",
     )
-    parser.add_argument("--add-bos-eos", action="store_true")
+    parser.add_argument(
+        "--add-bos-eos",
+        action="store_true",
+        default=True,
+        help="Add BOS/EOS tokens (enabled by default).",
+    )
+    parser.add_argument(
+        "--no-add-bos-eos",
+        action="store_false",
+        dest="add_bos_eos",
+        help="Disable adding BOS/EOS tokens.",
+    )
     parser.add_argument("--top-k", type=int, default=5, help="Top-k suggestions to show.")
-    parser.add_argument("--generate", action="store_true", help="Generate a continuation.")
+    parser.add_argument(
+        "--generate",
+        action="store_true",
+        default=True,
+        help="Generate a continuation (enabled by default).",
+    )
+    parser.add_argument(
+        "--no-generate",
+        action="store_false",
+        dest="generate",
+        help="Disable generation and show top-k suggestions.",
+    )
     parser.add_argument("--max-tokens", type=int, default=50, help="Max tokens to generate.")
     return parser.parse_args()
 
@@ -164,7 +197,8 @@ def main() -> int:
 
         if args.generate:
             generated = model.generate(prompt_tokens, max_tokens=args.max_tokens)
-            print(" ".join(generated))
+            formatted = _format_generated(generated, model.eos_token)
+            print(" ".join(formatted))
         else:
             suggestions = model.predict_top_k(prompt_tokens, k=args.top_k)
             for token, prob in suggestions:

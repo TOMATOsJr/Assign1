@@ -1,73 +1,112 @@
-Report
-Assumptions
-1. assuming that statistically when ever space is used with dash (after normalization of em-dash and en-dash) it most likely as clause break and and no-space as compound word.
-2. Learned that , in between numbers and outside need to be handled differently
+## Scripts and Commands
 
-Tokenizer pipeline usage
-1. Whitespace tokenizer on JSONL
+### Top-level scripts
+
+**tokenizer_pipeline.py**
+Purpose: Script that runs the tokenizer on cleaned data and also the one that trains the tokenizer when it is bpe. (tokenizes train and val on argument passing)
 ```powershell
-python tokenizer_pipeline.py --tokenizer whitespace --input cc100_en_final_train.jsonl --output cc100_en_tokens_whitespace --jsonl-field text
+python tokenizer_pipeline.py --tokenizer bpe --train-input cc100_en_train.jsonl --input cc100_en_train.jsonl --output cc100_en_tokens_bpe_train --val-input cc100_en_final_val.jsonl --val-output cc100_en_tokens_bpe_val --jsonl-field text --vocab-size 20000
 ```
 
-2. Regex tokenizer on JSONL (when implemented)
-```powershell
-python tokenizer_pipeline.py --tokenizer regex --input cc100_en_final_train.jsonl --output cc100_en_tokens_regex --jsonl-field text
-```
-
-3. BPE training + tokenizing train + val
-```powershell
-python tokenizer_pipeline.py --tokenizer bpe --train-input cc100_en_final_train.jsonl --input cc100_en_final_train.jsonl --output cc100_en_tokens_bpe_train --val-input cc100_en_final_val.jsonl --val-output cc100_en_tokens_bpe_val --jsonl-field text --vocab-size 20000
-```
-
-4. Whitespace tokenizer on plain text
-```powershell
-python tokenizer_pipeline.py --tokenizer whitespace --input input.txt --output tokens_whitespace.txt
-```
-
-Language model usage
-1. Train + evaluate perplexity (Kneser-Ney)
+(ignore this script)
+**run_language_model.py**
+Purpose: Train/evaluate an n-gram LM, generate text, or run autocomplete (but use interactive_autocomplete.py for autocomplete). Was primarily used for training and calculating perplexity scores.
 ```powershell
 python run_language_model.py --train cc100_en_tokens_bpe_train --train-format tokenized --val cc100_en_tokens_bpe_val --val-format tokenized --smoothing kneser_ney
-```
-
-2. Train + generate from prompt (MLE)
-```powershell
 python run_language_model.py --train cc100_en_tokens_whitespace --train-format tokenized --smoothing mle --prompt "the quick brown" --max-tokens 20
 ```
 
-Discount sweep for Kneser-Ney
+**interactive_autocomplete.py**
+Purpose: Train tokenizer + LM and run interactive generation or top-k suggestions. (main this one for any autocompletion task). Generates auto complete till end of sentence is generated.
+```powershell
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer whitespace --smoothing mle --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer whitespace --smoothing kneser_ney --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer whitespace --smoothing witten_bell --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer regex --smoothing mle --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer regex --smoothing kneser_ney --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer regex --smoothing witten_bell --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer bpe --bpe-vocab-size 20000 --smoothing mle --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer bpe --bpe-vocab-size 20000 --smoothing kneser_ney --n 4
+python interactive_autocomplete.py --train cc100_en_train.jsonl --train-format jsonl --jsonl-field text --tokenizer bpe --bpe-vocab-size 20000 --smoothing witten_bell --n 4
+```
+
+**sweep_kn_discount.py**
+Purpose: Sweep Kneser-Ney discount values and report validation perplexity.
 ```powershell
 python sweep_kn_discount.py --train cc100_en_tokens_bpe_train --val cc100_en_tokens_bpe_val --train-format tokenized --val-format tokenized --discounts 0.5,0.6,0.7,0.75,0.8,0.9
 ```
 
-Smoothing result on bpe
-1. python run_language_model.py --train cc100_en_tokens_bpe_train --train-format tokenized --val cc100_en_tokens_bpe_val --val-format tokenized --smoothing witten_bell
-Loading train: 100%|███████████████████████████████████████████████████████████████████████| 599999/599999 [00:02<00:00, 201944.29lines/s]
-Training: 100%|████████████████████████████████████████████████████████████████████████████████| 599999/599999 [02:13<00:00, 4505.27seq/s]
-Loading val: 100%|█████████████████████████████████████████████████████████████████████████| 200000/200000 [00:00<00:00, 275737.79lines/s]
-Perplexity: 100%|██████████████████████████████████████████████████████████████████████████████| 200000/200000 [01:09<00:00, 2860.83seq/s]
-Perplexity: 77.074871
+**run_all_configs.py**
+Purpose: Train/evaluate multiple tokenizer x smoothing configs on tokenized files.
+```powershell
+python run_all_configs.py --base cc100_en_tokens --n 4
+```
 
-2. python .\sweep_kn_discount.py --train .\cc100_en_tokens_bpe_train --val .\cc100_en_tokens_bpe_val --train-format tokenized --val-format tokenized --discounts 0.5,0.6,0.7,0.75,0.8,0.9
-Loading train: 100%|███████████████████████████████████████████████████████████████████████| 599999/599999 [00:02<00:00, 205008.86lines/s]
-Loading val: 100%|█████████████████████████████████████████████████████████████████████████| 200000/200000 [00:01<00:00, 198342.02lines/s]
-Training counts: 100%|█████████████████████████████████████████████████████████████████████████| 599999/599999 [02:15<00:00, 4427.06seq/s]
-OOV scan: 100%|██████████████████████████████████████████████████████████████████████████████| 200000/200000 [00:00<00:00, 252758.98seq/s]
+**count_charset.py**
+Purpose: Count unique characters in a text or JSONL file.
+```powershell
+python count_charset.py --input cc100_en_cleaned_final.jsonl --jsonl-field text
+python count_charset.py --input cc100_en_tokens_whitespace
+```
 
-OOV tokens in val: 0/9435808 (0.00%)
-Perplexity D=0.5: 100%|████████████████████████████████████████████████████████████████████████| 200000/200000 [01:22<00:00, 2426.49seq/s]
-Perplexity D=0.6: 100%|████████████████████████████████████████████████████████████████████████| 200000/200000 [01:30<00:00, 2204.70seq/s]
-Perplexity D=0.7: 100%|████████████████████████████████████████████████████████████████████████| 200000/200000 [01:29<00:00, 2228.33seq/s]
-Perplexity D=0.75: 100%|███████████████████████████████████████████████████████████████████████| 200000/200000 [02:05<00:00, 1596.58seq/s]
-Perplexity D=0.8: 100%|████████████████████████████████████████████████████████████████████████| 200000/200000 [01:22<00:00, 2410.74seq/s]
-Perplexity D=0.9: 100%|████████████████████████████████████████████████████████████████████████| 200000/200000 [01:28<00:00, 2268.65seq/s]
+**language_models.py**
+Purpose: Core n-gram LM implementations and smoothing strategies. No CLI.
 
-Discount        Perplexity
-0.5000  73.398002
-0.6000  67.679383
-0.7000  63.625362
-0.7500  62.098541
-0.8000  60.884527
-0.9000  59.534909
+**tokenizers.py**
+Purpose: Tokenizer implementations (whitespace, regex, BPE). No CLI.
 
-Best: D=0.9000 with perplexity 59.534909
+### cleaning_scripts/ (also refer the readme for cleaning in cleaning dir)
+
+**cleaning_scripts/data_cleaning.py**
+Purpose: Clean English JSONL text with normalization, punctuation handling, and <DASH> tagging.
+```powershell
+python cleaning_scripts/data_cleaning.py
+```
+
+**cleaning_scripts/data_cleaning_mn.py**
+Purpose: Clean Mongolian JSONL text with Cyrillic/Latin filtering and normalization.
+```powershell
+python cleaning_scripts/data_cleaning_mn.py
+```
+
+**cleaning_scripts/add_bos_eos_tokens.py**
+Purpose: Add <BOS>/<EOS> tags to English cleaned JSONL.
+```powershell
+python cleaning_scripts/add_bos_eos_tokens.py
+```
+
+**cleaning_scripts/add_bos_eos_tokens_mn.py**
+Purpose: Add <BOS>/<EOS> tags to Mongolian cleaned JSONL (Latin/Cyrillic caps).
+```powershell
+python cleaning_scripts/add_bos_eos_tokens_mn.py
+```
+
+**cleaning_scripts/convert_to_lowercase.py**
+Purpose: Lowercase English cleaned JSONL while preserving special tokens.
+```powershell
+python cleaning_scripts/convert_to_lowercase.py
+```
+
+**cleaning_scripts/convert_to_lowercase_mn.py**
+Purpose: Lowercase Mongolian cleaned JSONL while preserving special tokens.
+```powershell
+python cleaning_scripts/convert_to_lowercase_mn.py
+```
+
+**cleaning_scripts/train_test_val_split.py**
+Purpose: Split JSONL into train/val/test (default 60/20/20).
+```powershell
+python cleaning_scripts/train_test_val_split.py --input cc100_mn_cleaned_final.jsonl --train cc100_mn_train.jsonl --val cc100_mn_val.jsonl --test cc100_mn_test.jsonl --seed 42
+```
+
+**cleaning_scripts/dash_analysis.py**
+Purpose: Analyze dash usage patterns in JSONL.
+```powershell
+python cleaning_scripts/dash_analysis.py
+```
+
+**cleaning_scripts/count_capitals_after_period.py**
+Purpose: Count characters after sentence-ending periods in cleaned English JSONL.
+```powershell
+python cleaning_scripts/count_capitals_after_period.py
+```

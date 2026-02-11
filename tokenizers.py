@@ -11,7 +11,13 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections import Counter
 from dataclasses import dataclass, field
+import re
 from typing import Any, Dict, Iterable, List, Tuple
+
+try:
+	import regex as regex_re
+except ImportError:
+	regex_re = None
 
 try:
 	from tqdm import tqdm
@@ -57,10 +63,26 @@ class RegexTokenizer(BaseTokenizer):
 		if pattern is not None:
 			config["pattern"] = pattern
 		super().__init__(name="regex", config=config)
-		self.pattern = pattern
+		self.special_tokens = {"<BOS>", "<EOS>", "<DASH>"}
+		self.pattern = pattern or self._build_default_pattern()
+		if regex_re is None and "\\p{" in self.pattern:
+			raise ImportError(
+				"RegexTokenizer pattern uses Unicode properties (\\p{L}/\\p{N}). "
+				"Install the 'regex' package or provide a pattern compatible with 're'."
+			)
+		self._regex = regex_re or re
+		self._compiled = self._regex.compile(self.pattern)
 
 	def tokenize(self, text: str) -> List[str]:
-		raise NotImplementedError("RegexTokenizer.tokenize is not implemented yet")
+		if not text:
+			return []
+		return [match.group(0) for match in self._compiled.finditer(text)]
+
+	def _build_default_pattern(self) -> str:
+		specials = sorted(self.special_tokens, key=len, reverse=True)
+		specials_pattern = "|".join(re.escape(token) for token in specials)
+		# Order matters: specials, letter runs, number runs, then any single non-space char.
+		return rf"(?:{specials_pattern})|(?:\p{{L}}+)|(?:\p{{N}}+)|(?:\S)"
 
 
 class BPETokenizer(BaseTokenizer):
